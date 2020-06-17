@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>A-Star</title>
+        <style>
+            #map {
+                position:fixed;
+                margin:auto;
+                padding:0;
+                left:0;
+                right:0;
+                top:0;
+                bottom:0;
+            }
+            .box {
+                border:1px solid #000;
+                position:absolute;
+                text-align: center;
+                font-size:0.5em;
+            }
+            .box-title {
+                border:none;
+            }
+            .box-road {
+                background:#0f0;
+            }
+            .box-obstacle {
+                background:#f00;
+            }
+            .box-start {
+                background:#f0f;
+            }
+            .box-dest {
+                background:#ff0;
+            }
+            .box-path {
+                background:#00f;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+    </body>
+    <script>
+        var WID = 30;
+        var HEI = 30;
+        var X_DIS = 14;
+        var VH_DIS = 10;
+        var UNION_LEN = 20;
+        var ROAD = 0;
+        var OBSTACLE = 1;
+        var START = 'S';
+        var DEST = 'D';
+        var PATH = 'P';
+        var map = [];
+        var startPoint = null;
+        var destPoint = null;
+        var openList = [];
+        var closeList = [];
+
+        function dumpMap()
+        {
+            for (var i = 0; i < HEI; i++)
+            {
+                console.log(JSON.stringify(map[i]));
+            }
+            
+        }
+
+        function calcH(d, p)
+        {
+            return (Math.abs(d.x - p.x) + Math.abs(d.y - p.y)) * VH_DIS;
+        }
+
+        function calcG(s, p)
+        {
+            return s.G + (Math.abs(s.x - p.x) == 1 && Math.abs(s.y - p.y) == 1 ? X_DIS : VH_DIS);
+        }
+
+        function calcF(p)
+        {
+            return p.G + p.H;
+        }
+
+        function setPoint(p)
+        {
+            var els = document.getElementsByClassName('box');
+            for (var i = 0; i < els.length; i++)
+            {
+                if (els[i].getAttribute('title') == p.x + ',' + p.y)
+                {
+                    els[i].setAttribute('class', p.className);
+                    if (p.text != null)
+                    {
+                        els[i].innerHTML = '';
+                        els[i].append(p.text);
+                    }
+                        
+                }
+            }
+        }
+
+        function init()
+        {
+            var mapDom = document.getElementById('map');
+            mapDom.style.width = WID * UNION_LEN + 'px';
+            mapDom.style.height = HEI * UNION_LEN + 'px';
+            for (var i = 0; i < HEI; i++)
+            {
+                var el = document.createElement('div');
+                el.className = 'box box-title';
+                el.style.top = -1 * UNION_LEN + 'px';
+                el.style.left = i * UNION_LEN + 'px';
+                el.style.lineHeight = UNION_LEN + 'px';
+                el.append(i);
+                mapDom.appendChild(el);
+            }
+            for (var i = 0; i < HEI; i++)
+            {
+                var elT = document.createElement('div');
+                elT.className = 'box box-title';
+                elT.style.top = i * UNION_LEN + 'px';
+                elT.style.left = -1 * UNION_LEN + 'px';
+                elT.style.lineHeight = UNION_LEN + 'px';
+                elT.append(i);
+                mapDom.appendChild(elT);
+                map[i] = [];
+                for (var j = 0; j < WID; j++)
+                {
+                    var el = document.createElement('div');
+                    el.className = 'box ';
+                    el.style.top = i * UNION_LEN + 'px';
+                    el.style.left = j * UNION_LEN + 'px';
+                    el.style.lineHeight = UNION_LEN + 'px';
+                    el.setAttribute('title', i + ',' + j);
+                    if (Math.random() <= 0.2)
+                    {
+                        el.className += 'box-obstacle';
+                        map[i][j] = OBSTACLE;
+                    }
+                    else
+                    {
+                        el.className += 'box-road';
+                        map[i][j] = ROAD;
+                    }
+                    mapDom.appendChild(el);
+                }
+            }
+            while (true)
+            {
+                var x, y;
+                x = parseInt(Math.random() * HEI);
+                y = parseInt(Math.random() * WID);
+                if (map[x][y] != ROAD)
+                    continue;
+                map[x][y] = START;
+                startPoint = {x:x, y:y, val:START, parent:null, G:0, H:0, F:0, className:'box box-start', text:START};
+                x = parseInt(Math.random() * HEI);
+                y = parseInt(Math.random() * WID);
+                if (map[x][y] != ROAD)
+                    continue;
+                map[x][y] = DEST;
+                destPoint = {x:x, y:y, val:DEST, parent:null, G:0, H:0, F:0,  className:'box box-dest', text:DEST};
+                startPoint.H = calcH(destPoint, startPoint);
+                startPoint.F = calcF(startPoint);
+                destPoint.G = calcG(startPoint, destPoint);
+                destPoint.F = calcF(destPoint);
+                setPoint(startPoint);
+                setPoint(destPoint);
+                break;
+            }
+            var els = document.getElementsByClassName('box');
+            for (var i = 0; i < els.length; i++)
+            {
+                els[i].style.width = UNION_LEN + 'px';
+                els[i].style.height = UNION_LEN + 'px';
+            }
+        }
+
+        function getMinFPoint()
+        {
+            var minIndex = 0;
+            var minF = openList[0];
+            for (var i = 0; i < openList.length; i++)
+            {
+                if (openList[i].F < minF.F)
+                {
+                    minIndex = i;
+                    minF = openList[i];
+                }
+            }
+            openList.splice(minIndex, 1);
+            closeList.push(minF);
+            return minF;
+        }
+
+        function getSurrendReachablePoints(p)
+        {
+            var list = [];
+            for (var i = p.x - 1; i <= p.x + 1; i++)
+            {
+                for (var j = p.y - 1; j <= p.y + 1; j++)
+                {
+                    if (i < 0 || i >= HEI || j < 0 || j >= WID)
+                        continue;
+                    if (i == p.x && j == p.y)
+                        continue;
+                    if (map[i][j] == OBSTACLE)
+                        continue;
+                    if (Math.abs(i - p.x) == 1 && Math.abs(j - p.y) == 1 && map[i][p.y] == OBSTACLE && map[p.x][j] == OBSTACLE)
+                        continue;
+                    var tmp = {x:i, y:j, val:PATH, parent:p, G:0, H:0, F:0, className:'box box-path'};
+                    tmp.G = calcG(p, tmp);
+                    tmp.H = calcH(destPoint, tmp);
+                    tmp.F = calcF(tmp);
+                    list.push(tmp);
+                }
+            }
+            return list;
+        }
+
+        function findInList(l, p)
+        {
+            for (var j = 0; j < l.length; j++)
+            {
+                if (l[j].x == p.x && l[j].y == p.y)
+                    return l[j];
+            }
+            return null;
+        }
+
+        function start()
+        {
+            init();
+            openList.push(startPoint);
+            var findDest = null;
+            while (openList.length > 0)
+            {
+                var minFP = getMinFPoint();
+                var surrPoints = getSurrendReachablePoints(minFP);
+                for (var i = 0; i < surrPoints.length; i++)
+                {
+                    var checkPoint = surrPoints[i];
+                    if (findInList(closeList, checkPoint))
+                        continue;
+                    var existP = null;
+                    if (existP = findInList(openList, checkPoint))
+                    {
+                        var newF = calcG(existP, minFP) + existP.H;
+                        var oldF = existP.F;
+                        if (newF < oldF)
+                        {
+                            existP.parent = minFP;
+                        }
+                    }   
+                    else
+                    {
+                        openList.push(checkPoint);
+                    }
+                }
+                if (findDest = findInList(openList, destPoint))
+                    break;
+            }
+            if (findDest)
+            {
+                console.log('已找到');
+                findDest.className = 'box box-dest';
+                while (findDest)
+                {
+                    setPoint(findDest);
+                    findDest = findDest.parent;
+                }
+            }
+            else
+            {
+                console.log('未找到');
+            }
+        }
+        start();
+    </script>
+</html>
